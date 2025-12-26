@@ -48,6 +48,13 @@
       "default": true,
       "description": "Enable automatic plugin updates."
     },
+    "max_rate_limit_wait_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 3600,
+      "default": 300,
+      "description": "Maximum time in seconds to wait when all accounts are rate-limited. If the minimum wait time exceeds this, fails fast with an error. Set to 0 to disable (wait indefinitely)."
+    },
     "signature_cache": {
       "type": "object",
       "description": "Signature cache configuration for persisting thinking block signatures. Only used when keep_thinking is enabled.",
