@@ -89,7 +89,11 @@ function buildSignatureSessionKey(
 
 
 function shouldCacheThinkingSignatures(model?: string): boolean {
-  return typeof model === "string" && model.toLowerCase().includes("claude");
+  if (typeof model !== "string") return false;
+  const lower = model.toLowerCase();
+  // Both Claude and Gemini 3 models require thought signature caching
+  // for multi-turn conversations with function calling
+  return lower.includes("claude") || lower.includes("gemini-3");
 }
 
 function hashConversationSeed(seed: string): string {
