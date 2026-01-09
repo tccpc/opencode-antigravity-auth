@@ -544,6 +544,54 @@ Try add this line to in `google` field under `provider`
 ### Error during the session
 If you encounter error during the session, try chat `continue` the recover session mechanism should be trigger and you can continue the session, if the error blocked the session please workaround by use command `/undo` to revert to the state before the error and try again it should work
 
+### Safari OAuth Callback Fails (macOS)
+
+**Symptoms:**
+- "fail to authorize" after successful Google login in browser
+- Safari shows "Safari can't open the page" or connection refused
+- Callback appears to succeed in browser but plugin reports failure
+
+**Cause:** Safari's "HTTPS-Only Mode" (enabled by default in recent macOS versions) blocks the `http://localhost` callback URL used during OAuth authentication.
+
+**Solutions (choose one):**
+
+1. **Use a different browser** (easiest):
+   Copy the URL printed by `opencode auth login` and paste it into Chrome or Firefox instead of Safari.
+
+2. **Temporarily disable HTTPS-Only Mode:**
+   - Safari > Settings (⌘,) > Privacy
+   - Uncheck "Enable HTTPS-Only Mode"
+   - Run `opencode auth login`
+   - Re-enable after successful authentication
+
+3. **Manual callback URL extraction** (advanced):
+   - When Safari shows the error, look at the address bar
+   - The URL should contain `?code=...&scope=...`
+   - This auth code can be used manually (see [issue #119](https://github.com/NoeFabris/opencode-antigravity-auth/issues/119) for updates on manual auth support)
+
+### Port Already in Use
+
+If OAuth fails with "Address already in use" or similar port binding errors:
+
+```bash
+# Find what's using the OAuth callback port (usually 8080 or dynamic)
+lsof -i :8080
+
+# If a stale process is found, terminate it
+kill -9 <PID>
+
+# Retry authentication
+opencode auth login
+```
+
+### WSL2 / Remote Development
+
+For users running OpenCode in WSL2 or over SSH:
+- The OAuth callback requires the browser to reach `localhost` on the machine running OpenCode
+- For WSL2: Ensure port forwarding is configured, or use VS Code's port forwarding
+- For SSH: Use SSH port forwarding: `ssh -L 8080:localhost:8080 user@remote`
+- For headless servers: See [issue #119](https://github.com/NoeFabris/opencode-antigravity-auth/issues/119) for manual URL auth (in development)
+
 ## Known Plugin Interactions
 
 ### @tarquinen/opencode-dcp
