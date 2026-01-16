@@ -171,7 +171,7 @@ Copy-paste ready configs with all recommended settings enabled.
 These settings are already `true` by default — you don't need to set them:
 
 | Setting | Default | What it does |
-|---------|---------|--------------
+|---------|---------|--------------|
 | `session_recovery` | `true` | Auto-recover from errors |
 | `auto_update` | `true` | Keep plugin updated |
 | `switch_on_first_rate_limit` | `true` | Fast account switching |
@@ -179,7 +179,7 @@ These settings are already `true` by default — you don't need to set them:
 These settings are `false` by default:
 
 | Setting | Default | What it does |
-|---------|---------|--------------
+|---------|---------|--------------|
 | `keep_thinking` | `false` | Preserve Claude thinking (may degrade stability) |
 | `auto_resume` | `false` | Auto-continue after recovery |
 
