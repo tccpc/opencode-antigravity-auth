@@ -6,8 +6,9 @@ export interface UsageReport {
   family: string;
   tokens: {
     total: number;
-    prompt: number;
-    candidates: number;
+    input: number;
+    output: number;
+    cached: number;
   };
   success: boolean;
   latencyMs: number;

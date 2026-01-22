@@ -1506,7 +1506,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 }
                 
                 let streamingUsageReported = false;
-                const onStreamingUsage = (usage: { totalTokenCount?: number; promptTokenCount?: number; candidatesTokenCount?: number }) => {
+                const onStreamingUsage = (usage: { totalTokenCount?: number; promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }) => {
                   if (streamingUsageReported) return;
                   streamingUsageReported = true;
                   reportUsage({
@@ -1515,8 +1515,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     family,
                     tokens: {
                       total: usage.totalTokenCount ?? 0,
-                      prompt: usage.promptTokenCount ?? 0,
-                      candidates: usage.candidatesTokenCount ?? 0,
+                      input: usage.promptTokenCount ?? 0,
+                      output: usage.candidatesTokenCount ?? 0,
+                      cached: usage.cachedContentTokenCount ?? 0,
                     },
                     success: true,
                     latencyMs: Date.now() - requestStartTime,
@@ -1562,8 +1563,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     family,
                     tokens: {
                       total: parseInt(transformedResponse.headers.get('x-antigravity-total-token-count') || '0', 10),
-                      prompt: parseInt(transformedResponse.headers.get('x-antigravity-prompt-token-count') || '0', 10),
-                      candidates: parseInt(transformedResponse.headers.get('x-antigravity-candidates-token-count') || '0', 10),
+                      input: parseInt(transformedResponse.headers.get('x-antigravity-prompt-token-count') || '0', 10),
+                      output: parseInt(transformedResponse.headers.get('x-antigravity-candidates-token-count') || '0', 10),
+                      cached: parseInt(transformedResponse.headers.get('x-antigravity-cached-content-token-count') || '0', 10),
                     },
                     success: true,
                     latencyMs: Date.now() - requestStartTime,
