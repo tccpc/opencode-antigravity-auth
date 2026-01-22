@@ -1271,8 +1271,6 @@ export const createAntigravityPlugin = (providerId: string) => async (
                      
                      await sleep(waitMs, abortSignal);
                      
-                     await sleep(waitMs, abortSignal);
-                     
                      // CRITICAL FIX: Decrement i so that the loop 'continue' retries the SAME endpoint index
                      // (i++ in the loop will bring it back to the current index)
                      // But limit retries to prevent infinite loops (Greptile feedback)
