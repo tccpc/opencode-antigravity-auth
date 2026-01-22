@@ -189,9 +189,63 @@ export class AccountManager {
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private savePromiseResolvers: Array<() => void> = [];
 
+  /** When true, disables disk persistence (used in remote mode) */
+  public _memoryOnly = false;
+
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
     return new AccountManager(authFallback, stored);
+  }
+
+  static async loadFromRemote(
+    apiEndpoint: string,
+    apiKey: string
+  ): Promise<AccountManager> {
+    const response = await fetch(`${apiEndpoint}/api/accounts`, {
+      headers: {
+        'X-API-Key': apiKey,
+        'User-Agent': 'opencode-antigravity-auth',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Remote account service error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    const baseNow = nowMs();
+    const accounts: ManagedAccount[] = data.accounts.map((acc: any, index: number) => ({
+      index,
+      email: acc.email,
+      addedAt: baseNow,
+      lastUsed: 0,
+      parts: {
+        refreshToken: acc.refreshToken,
+        projectId: acc.projectId,
+        managedProjectId: acc.managedProjectId,
+      },
+      rateLimitResetTimes: {},
+      touchedForQuota: {},
+    }));
+
+    const manager = new AccountManager(undefined, {
+      version: 3,
+      accounts: accounts.map(a => ({
+        email: a.email,
+        refreshToken: a.parts.refreshToken,
+        projectId: a.parts.projectId,
+        managedProjectId: a.parts.managedProjectId,
+        addedAt: a.addedAt,
+        lastUsed: a.lastUsed,
+        rateLimitResetTimes: a.rateLimitResetTimes,
+      })),
+      activeIndex: 0,
+    });
+
+    manager._memoryOnly = true;
+
+    return manager;
   }
 
   constructor(authFallback?: OAuthAuthDetails, stored?: AccountStorageV3 | null) {
@@ -650,6 +704,10 @@ export class AccountManager {
   }
 
   async saveToDisk(): Promise<void> {
+    if (this._memoryOnly) {
+      return;
+    }
+
     const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude);
     const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini);
     

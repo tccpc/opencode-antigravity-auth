@@ -10,10 +10,19 @@ export interface SignatureStore {
   delete(sessionKey: string): void;
 }
 
+export interface UsageMetadata {
+  totalTokenCount?: number;
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  cachedContentTokenCount?: number;
+  thoughtsTokenCount?: number;
+}
+
 export interface StreamingCallbacks {
   onCacheSignature?: (sessionKey: string, text: string, signature: string) => void;
   onInjectDebug?: (response: unknown, debugText: string) => unknown;
   transformThinkingParts?: (parts: unknown) => unknown;
+  onUsage?: (usage: UsageMetadata) => void;
 }
 
 export interface StreamingOptions {

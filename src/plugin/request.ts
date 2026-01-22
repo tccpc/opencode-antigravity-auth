@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { UsageMetadata } from './core/streaming/types';
 import {
   ANTIGRAVITY_HEADERS,
   GEMINI_CLI_HEADERS,
@@ -1455,6 +1456,7 @@ export async function transformAntigravityResponse(
   toolDebugSummary?: string,
   toolDebugPayload?: string,
   debugLines?: string[],
+  onUsage?: (usage: UsageMetadata) => void,
 ): Promise<Response> {
   const contentType = response.headers.get("content-type") ?? "";
   const isJsonResponse = contentType.includes("application/json");
@@ -1489,6 +1491,7 @@ export async function transformAntigravityResponse(
         onCacheSignature: cacheSignature,
         onInjectDebug: injectDebugThinking,
         transformThinkingParts,
+        onUsage,
       },
       {
         signatureSessionKey: sessionId,
@@ -1591,8 +1594,10 @@ export async function transformAntigravityResponse(
     const effectiveBody = patched ?? parsed ?? undefined;
 
     const usage = usageFromSse ?? (effectiveBody ? extractUsageMetadata(effectiveBody) : null);
-    if (usage?.cachedContentTokenCount !== undefined) {
-      headers.set("x-antigravity-cached-content-token-count", String(usage.cachedContentTokenCount));
+    if (usage) {
+      if (usage.cachedContentTokenCount !== undefined) {
+        headers.set("x-antigravity-cached-content-token-count", String(usage.cachedContentTokenCount));
+      }
       if (usage.totalTokenCount !== undefined) {
         headers.set("x-antigravity-total-token-count", String(usage.totalTokenCount));
       }

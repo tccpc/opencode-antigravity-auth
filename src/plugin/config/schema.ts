@@ -317,6 +317,25 @@ export const AntigravityConfigSchema = z.object({
      */
     grounding_threshold: z.number().min(0).max(1).default(0.3),
   }).optional(),
+
+  // =========================================================================
+  // Remote Account Service
+  // =========================================================================
+
+  /**
+   * Remote account service endpoint URL.
+   * When configured with api_key, accounts are loaded from remote service
+   * instead of local file.
+   * Env override: OPENCODE_ANTIGRAVITY_API_ENDPOINT
+   */
+  api_endpoint: z.string().url().optional(),
+
+  /**
+   * API key for authenticating with remote account service.
+   * Required when api_endpoint is configured.
+   * Env override: IMPORTANT_KEY
+   */
+  api_key: z.string().optional(),
 });
 
 export type AntigravityConfig = z.infer<typeof AntigravityConfigSchema>;

@@ -182,6 +182,12 @@ function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
           ? Math.min(1, Math.max(0, parseFloat(env.OPENCODE_ANTIGRAVITY_WEB_SEARCH_THRESHOLD) || 0.3))
           : config.web_search?.grounding_threshold ?? 0.3,
     },
+
+    // OPENCODE_ANTIGRAVITY_API_ENDPOINT=https://your-service.com
+    api_endpoint: env.OPENCODE_ANTIGRAVITY_API_ENDPOINT || config.api_endpoint,
+
+    // IMPORTANT_KEY=your_key
+    api_key: env.IMPORTANT_KEY || config.api_key,
   };
 }
 

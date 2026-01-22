@@ -40,6 +40,7 @@ import { initDiskSignatureCache } from "./plugin/cache";
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
 import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
+import { initUsageReporter, reportUsage } from "./plugin/usage-reporter";
 import type {
   GetAuth,
   LoaderResult,
@@ -754,26 +755,32 @@ export const createAntigravityPlugin = (providerId: string) => async (
     loader: async (getAuth: GetAuth, provider: Provider): Promise<LoaderResult | Record<string, unknown>> => {
       const auth = await getAuth();
       
-      // If OpenCode has no valid OAuth auth, clear any stale account storage
-      if (!isOAuthAuth(auth)) {
-        try {
-          await clearAccounts();
-        } catch {
-          // ignore
+      let accountManager: AccountManager;
+
+      if (config.api_endpoint && config.api_key) {
+        accountManager = await AccountManager.loadFromRemote(config.api_endpoint, config.api_key);
+        initUsageReporter(config.api_endpoint, config.api_key);
+      } else {
+        if (!isOAuthAuth(auth)) {
+          try {
+            await clearAccounts();
+          } catch {
+            // ignore
+          }
+          return {};
         }
-        return {};
-      }
 
-      // Validate that stored accounts are in sync with OpenCode's auth
-      // If OpenCode's refresh token doesn't match any stored account, clear stale storage
-      const authParts = parseRefreshParts(auth.refresh);
-      const storedAccounts = await loadAccounts();
-      
-      // Note: AccountManager now ensures the current auth is always included in accounts
+        // Validate that stored accounts are in sync with OpenCode's auth
+        // If OpenCode's refresh token doesn't match any stored account, clear stale storage
+        const authParts = parseRefreshParts(auth.refresh);
+        const storedAccounts = await loadAccounts();
+        
+        // Note: AccountManager now ensures the current auth is always included in accounts
 
-      const accountManager = await AccountManager.loadFromDisk(auth);
-      if (accountManager.getAccountCount() > 0) {
-        accountManager.requestSaveToDisk();
+        accountManager = await AccountManager.loadFromDisk(auth);
+        if (accountManager.getAccountCount() > 0) {
+          accountManager.requestSaveToDisk();
+        }
       }
 
       // Initialize proactive token refresh queue (ported from LLM-API-Key-Proxy)
@@ -828,6 +835,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           const urlString = toUrlString(input);
           const family = getModelFamilyFromUrl(urlString);
           const model = extractModelFromUrl(urlString);
+          const requestStartTime = Date.now();
           const debugLines: string[] = [];
           const pushDebug = (line: string) => {
             if (!isDebugEnabled()) return;
@@ -1497,6 +1505,24 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   emptyResponseAttempts.delete(emptyAttemptKeyClean);
                 }
                 
+                let streamingUsageReported = false;
+                const onStreamingUsage = (usage: { totalTokenCount?: number; promptTokenCount?: number; candidatesTokenCount?: number }) => {
+                  if (streamingUsageReported) return;
+                  streamingUsageReported = true;
+                  reportUsage({
+                    accountEmail: account.email ?? '',
+                    model: prepared.effectiveModel ?? model ?? '',
+                    family,
+                    tokens: {
+                      total: usage.totalTokenCount ?? 0,
+                      prompt: usage.promptTokenCount ?? 0,
+                      candidates: usage.candidatesTokenCount ?? 0,
+                    },
+                    success: true,
+                    latencyMs: Date.now() - requestStartTime,
+                  });
+                };
+                
                 const transformedResponse = await transformAntigravityResponse(
                   response,
                   prepared.streaming,
@@ -1510,6 +1536,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   prepared.toolDebugSummary,
                   prepared.toolDebugPayload,
                   debugLines,
+                  onStreamingUsage,
                 );
 
                 // Check for context errors and show appropriate toast
@@ -1526,6 +1553,21 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       "warning"
                     );
                   }
+                }
+
+                if (response.ok && !streamingUsageReported) {
+                  reportUsage({
+                    accountEmail: account.email ?? '',
+                    model: prepared.effectiveModel ?? model ?? '',
+                    family,
+                    tokens: {
+                      total: parseInt(transformedResponse.headers.get('x-antigravity-total-token-count') || '0', 10),
+                      prompt: parseInt(transformedResponse.headers.get('x-antigravity-prompt-token-count') || '0', 10),
+                      candidates: parseInt(transformedResponse.headers.get('x-antigravity-candidates-token-count') || '0', 10),
+                    },
+                    success: true,
+                    latencyMs: Date.now() - requestStartTime,
+                  });
                 }
 
                 return transformedResponse;

@@ -3,6 +3,7 @@ import type {
   StreamingCallbacks,
   StreamingOptions,
   ThoughtBuffer,
+  UsageMetadata,
 } from './types';
 import { processImageData } from '../../image-saver';
 
@@ -192,6 +193,23 @@ export function transformSseLine(
   try {
     const parsed = JSON.parse(json) as { response?: unknown };
     if (parsed.response !== undefined) {
+      // Extract and report usage metadata if present (usually in the final chunk)
+      if (callbacks.onUsage) {
+        const resp = parsed.response as Record<string, unknown>;
+        const usageMeta = resp.usageMetadata as Record<string, unknown> | undefined;
+        if (usageMeta && typeof usageMeta === 'object') {
+          const toNumber = (v: unknown): number | undefined =>
+            typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+          callbacks.onUsage({
+            totalTokenCount: toNumber(usageMeta.totalTokenCount),
+            promptTokenCount: toNumber(usageMeta.promptTokenCount),
+            candidatesTokenCount: toNumber(usageMeta.candidatesTokenCount),
+            cachedContentTokenCount: toNumber(usageMeta.cachedContentTokenCount),
+            thoughtsTokenCount: toNumber(usageMeta.thoughtsTokenCount),
+          });
+        }
+      }
+
       if (options.cacheSignatures && options.signatureSessionKey) {
         cacheThinkingSignaturesFromResponse(
           parsed.response,
