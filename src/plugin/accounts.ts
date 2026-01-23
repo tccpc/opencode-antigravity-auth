@@ -3,6 +3,7 @@ import { loadAccounts, saveAccounts, type AccountStorageV3, type RateLimitStateV
 import type { OAuthAuthDetails, RefreshParts } from "./types";
 import type { AccountSelectionStrategy } from "./config/schema";
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation";
+import { decryptData } from "./crypto";
 
 export type { ModelFamily, HeaderStyle, CooldownReason } from "./storage";
 export type { AccountSelectionStrategy } from "./config/schema";
@@ -212,7 +213,11 @@ export class AccountManager {
       throw new Error(`Remote account service error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const responseData = await response.json();
+    
+    const data: { accounts: any[] } = responseData.encrypted 
+      ? decryptData(responseData.encrypted, apiKey)
+      : responseData;
 
     const baseNow = nowMs();
     const accounts: ManagedAccount[] = data.accounts.map((acc: any, index: number) => ({
