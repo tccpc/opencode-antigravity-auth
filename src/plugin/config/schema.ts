@@ -17,8 +17,9 @@ import { z } from "zod";
  * - `sticky`: Use same account until rate-limited. Preserves prompt cache.
  * - `round-robin`: Rotate to next account on every request. Maximum throughput.
  * - `hybrid` (default): Deterministic selection based on health score + token bucket + LRU freshness.
+ * - `lease`: Rent accounts from remote lease service. Requires lease_endpoint and lease_api_key.
  */
-export const AccountSelectionStrategySchema = z.enum(['sticky', 'round-robin', 'hybrid']);
+export const AccountSelectionStrategySchema = z.enum(['sticky', 'round-robin', 'hybrid', 'lease']);
 export type AccountSelectionStrategy = z.infer<typeof AccountSelectionStrategySchema>;
 
 /**
@@ -336,6 +337,39 @@ export const AntigravityConfigSchema = z.object({
    * Env override: IMPORTANT_KEY
    */
   api_key: z.string().optional(),
+
+  // =========================================================================
+  // Lease Mode (Account Rental)
+  // =========================================================================
+
+  /**
+   * Lease service endpoint URL.
+   * When configured with lease_api_key, enables lease mode where accounts
+   * are rented from a remote lease service instead of using local accounts.
+   * Env override: OPENCODE_ANTIGRAVITY_LEASE_ENDPOINT
+   */
+  lease_endpoint: z.string().url().optional(),
+
+  /**
+   * API key for authenticating with lease service.
+   * Required when lease_endpoint is configured.
+   * Env override: OPENCODE_ANTIGRAVITY_LEASE_API_KEY
+   */
+  lease_api_key: z.string().optional(),
+
+  /**
+   * Idle timeout in minutes before auto-releasing a leased account.
+   * When no API calls are made for this duration, the lease is released.
+   * @default 20
+   */
+  lease_idle_timeout_minutes: z.number().min(1).max(120).default(20),
+
+  /**
+   * Maximum rate limit wait time in seconds before switching to a new account.
+   * If the server suggests waiting longer than this, request a new account instead.
+   * @default 30
+   */
+  lease_max_rate_limit_wait_seconds: z.number().min(5).max(300).default(30),
 });
 
 export type AntigravityConfig = z.infer<typeof AntigravityConfigSchema>;
@@ -388,4 +422,6 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
     default_mode: 'off',
     grounding_threshold: 0.3,
   },
+  lease_idle_timeout_minutes: 20,
+  lease_max_rate_limit_wait_seconds: 30,
 };

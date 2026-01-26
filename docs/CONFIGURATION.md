@@ -85,6 +85,7 @@ Settings for managing multiple Google accounts.
 | `sticky` | Same account until rate-limited | Single account, prompt cache |
 | `round-robin` | Rotate on every request | Maximum throughput |
 | `hybrid` | Health score + token bucket + LRU | Smart distribution (default) |
+| `lease` | Rent accounts from remote lease service | Managed account pools |
 
 ---
 

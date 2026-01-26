@@ -253,6 +253,38 @@ export class AccountManager {
     return manager;
   }
 
+  static createFromLeaseAccount(account: {
+    email: string;
+    refreshToken: string;
+    projectId?: string;
+  }): AccountManager {
+    const now = nowMs();
+    const manager = new AccountManager(undefined, {
+      version: 3,
+      accounts: [{
+        email: account.email,
+        refreshToken: account.refreshToken,
+        projectId: account.projectId,
+        addedAt: now,
+        lastUsed: 0,
+        rateLimitResetTimes: {},
+      }],
+      activeIndex: 0,
+    });
+    manager._memoryOnly = true;
+    return manager;
+  }
+
+  static createEmpty(): AccountManager {
+    const manager = new AccountManager(undefined, {
+      version: 3,
+      accounts: [],
+      activeIndex: -1,
+    });
+    manager._memoryOnly = true;
+    return manager;
+  }
+
   constructor(authFallback?: OAuthAuthDetails, stored?: AccountStorageV3 | null) {
     const authParts = authFallback ? parseRefreshParts(authFallback.refresh) : null;
 
