@@ -360,9 +360,10 @@ export const AntigravityConfigSchema = z.object({
   /**
    * Idle timeout in minutes before auto-releasing a leased account.
    * When no API calls are made for this duration, the lease is released.
-   * @default 20
+   * This is used as fallback when server doesn't provide idle_timeout_seconds.
+   * @default 5
    */
-  lease_idle_timeout_minutes: z.number().min(1).max(120).default(20),
+  lease_idle_timeout_minutes: z.number().min(1).max(120).default(5),
 
   /**
    * Maximum rate limit wait time in seconds before switching to a new account.
@@ -422,6 +423,6 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
     default_mode: 'off',
     grounding_threshold: 0.3,
   },
-  lease_idle_timeout_minutes: 20,
+  lease_idle_timeout_minutes: 5,
   lease_max_rate_limit_wait_seconds: 30,
 };

@@ -791,6 +791,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           log.info(`Using leased account: ${leaseAccount.email}`);
           accountManager = AccountManager.createFromLeaseAccount(leaseAccount);
           isLeaseMode = true;
+          initUsageReporter(leaseEndpoint!, leaseApiKey!);
 
           leaseManager.onRelease(() => {
             accountManager = AccountManager.createEmpty();

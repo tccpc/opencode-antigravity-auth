@@ -3,7 +3,7 @@ import { decryptData } from './crypto.js';
 
 const FETCH_TIMEOUT_MS = 10000;
 const DEFAULT_HEARTBEAT_RATIO = 0.5; // 50% of TTL
-const DEFAULT_IDLE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 const DEFAULT_QUOTA_CHECK_INTERVAL_MS = 2 * 60 * 1000; // 5 minutes
 const DEFAULT_LOW_QUOTA_THRESHOLD = 0.2; // 80%
@@ -53,6 +53,7 @@ interface LeaseAcquireResponse {
   account: string;
   expires_at: string;
   ttl_seconds: number;
+  idle_timeout_seconds?: number;
 }
 
 /**
@@ -72,6 +73,7 @@ interface DecryptedAccountData {
 interface LeaseRenewResponse {
   expires_at: string;
   ttl_seconds: number;
+  idle_timeout_seconds?: number;
 }
 
 /**
@@ -195,8 +197,12 @@ export class LeaseManager {
         expiresAt: new Date(data.expires_at),
       };
 
-      // Start heartbeat based on TTL
       this.startHeartbeat(data.ttl_seconds);
+
+      if (data.idle_timeout_seconds) {
+        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
+        debugLogToFile(`[lease-manager] Updated idle timeout from server: ${data.idle_timeout_seconds}s`);
+      }
 
       this.updateActivity();
       this.startIdleCheck();
@@ -298,9 +304,12 @@ export class LeaseManager {
 
       this.lease.expiresAt = new Date(data.expires_at);
 
-      // Restart heartbeat with new TTL
       this.stopHeartbeat();
       this.startHeartbeat(data.ttl_seconds);
+
+      if (data.idle_timeout_seconds) {
+        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
+      }
 
       debugLogToFile(`[lease-manager] Renewed lease, new expiry: ${this.lease.expiresAt.toISOString()}`);
     } catch (error) {
@@ -356,7 +365,6 @@ export class LeaseManager {
         throw new Error('No new account available after reporting issue');
       }
 
-      // Stop old heartbeat
       this.stopHeartbeat();
 
       const decrypted = decryptData<DecryptedAccountData>(data.account, this.apiKey);
@@ -371,8 +379,11 @@ export class LeaseManager {
         expiresAt: new Date(data.expires_at),
       };
 
-      // Start new heartbeat
       this.startHeartbeat(data.ttl_seconds);
+
+      if (data.idle_timeout_seconds) {
+        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
+      }
 
       this.updateActivity();
       this.startIdleCheck();
