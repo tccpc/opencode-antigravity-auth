@@ -255,6 +255,10 @@ OpenCode uses `~/.config/opencode/` on **all platforms** including Windows.
 
 > **Windows users**: `~` resolves to your user home directory (e.g., `C:\Users\YourName`). Do NOT use `%APPDATA%`.
 
+> **Custom path**: Set `OPENCODE_CONFIG_DIR` environment variable to use a custom location.
+
+> **Windows migration**: If upgrading from plugin v1.3.x or earlier, the plugin will automatically find your existing config in `%APPDATA%\opencode\` and use it. New installations use `~/.config/opencode/`.
+
 ---
 
 ### Multi-Account Auth Issues
@@ -608,8 +612,9 @@ For all options, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 **Environment variables:**
 ```bash
-OPENCODE_ANTIGRAVITY_DEBUG=1 opencode   # Enable debug logging
-OPENCODE_ANTIGRAVITY_DEBUG=2 opencode   # Verbose logging
+OPENCODE_CONFIG_DIR=/path/to/config opencode  # Custom config directory
+OPENCODE_ANTIGRAVITY_DEBUG=1 opencode         # Enable debug logging
+OPENCODE_ANTIGRAVITY_DEBUG=2 opencode         # Verbose logging
 ```
 
 ---

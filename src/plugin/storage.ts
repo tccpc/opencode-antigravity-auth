@@ -203,22 +203,70 @@ export interface AccountStorageV3 {
 
 type AnyAccountStorage = AccountStorageV1 | AccountStorage | AccountStorageV3;
 
+/**
+ * Gets the legacy Windows config directory (%APPDATA%\opencode).
+ * Used for migration from older plugin versions.
+ */
+function getLegacyWindowsConfigDir(): string {
+  return join(
+    process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
+    "opencode",
+  );
+}
+
+/**
+ * Gets the config directory path, with the following precedence:
+ * 1. OPENCODE_CONFIG_DIR env var (if set)
+ * 2. ~/.config/opencode (all platforms, including Windows)
+ *
+ * On Windows, also checks for legacy %APPDATA%\opencode path for migration.
+ */
 function getConfigDir(): string {
-  const platform = process.platform;
-  if (platform === "win32") {
-    return join(
-      process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
-      "opencode",
-    );
+  // 1. Check for explicit override via env var
+  if (process.env.OPENCODE_CONFIG_DIR) {
+    return process.env.OPENCODE_CONFIG_DIR;
   }
 
+  // 2. Use ~/.config/opencode on all platforms (including Windows)
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
   return join(xdgConfig, "opencode");
 }
 
-export function getStoragePath(): string {
-  return join(getConfigDir(), "antigravity-accounts.json");
+/**
+ * Gets the storage path, checking legacy Windows location for migration.
+ * If the new path doesn't exist but the legacy path does, returns the legacy path.
+ */
+function getStoragePathWithMigration(): string {
+  const newPath = join(getConfigDir(), "antigravity-accounts.json");
+
+  // On Windows, check for legacy %APPDATA% path if new path doesn't exist
+  if (process.platform === "win32") {
+    if (!existsSync(newPath)) {
+      const legacyPath = join(
+        getLegacyWindowsConfigDir(),
+        "antigravity-accounts.json",
+      );
+      if (existsSync(legacyPath)) {
+        log.info("Using legacy Windows config path for migration", {
+          legacyPath,
+          newPath,
+        });
+        return legacyPath;
+      }
+    }
+  }
+
+  return newPath;
 }
+
+export function getStoragePath(): string {
+  return getStoragePathWithMigration();
+}
+
+/**
+ * Gets the config directory path. Exported for use by other modules.
+ */
+export { getConfigDir };
 
 const LOCK_OPTIONS = {
   stale: 10000,
