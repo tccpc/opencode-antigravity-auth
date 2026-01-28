@@ -36,7 +36,7 @@ import { AccountManager, type ModelFamily, parseRateLimitReason, calculateBackof
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { loadConfig, initRuntimeConfig, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
-import { initDiskSignatureCache } from "./plugin/cache";
+import { initDiskSignatureCache, clearCachedAuth } from "./plugin/cache";
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
 import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
@@ -710,6 +710,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
       apiKey: leaseApiKey,
       idleTimeoutMs: (config.lease_idle_timeout_minutes ?? 20) * 60 * 1000,
       maxRateLimitWaitMs: (config.lease_max_rate_limit_wait_seconds ?? 30) * 1000,
+    });
+    leaseManager.onLeaseRevoked((refreshToken) => {
+      clearCachedAuth(refreshToken);
+      log.info(`Lease revoked, cleared auth cache for refresh token`);
     });
     initLifecycle(leaseManager);
     log.info(`LeaseManager initialized with endpoint: ${leaseEndpoint}`);

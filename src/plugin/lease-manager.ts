@@ -53,7 +53,6 @@ interface LeaseAcquireResponse {
   account: string;
   expires_at: string;
   ttl_seconds: number;
-  idle_timeout_seconds?: number;
 }
 
 /**
@@ -73,7 +72,6 @@ interface DecryptedAccountData {
 interface LeaseRenewResponse {
   expires_at: string;
   ttl_seconds: number;
-  idle_timeout_seconds?: number;
 }
 
 /**
@@ -139,6 +137,7 @@ export class LeaseManager {
   private lastQuotaCheck: number = 0;
   private maxRateLimitWaitMs: number;
   private onReleaseCallback: (() => void) | null = null;
+  private onLeaseRevokedCallback: ((refreshToken: string) => void) | null = null;
 
   constructor(config: LeaseManagerConfig) {
     this.clientId = generateUUID();
@@ -153,6 +152,14 @@ export class LeaseManager {
 
   onRelease(callback: () => void): void {
     this.onReleaseCallback = callback;
+  }
+
+  /**
+   * Register a callback to be called when the lease is revoked by the server.
+   * The callback receives the refresh token so the caller can clear relevant caches.
+   */
+  onLeaseRevoked(callback: (refreshToken: string) => void): void {
+    this.onLeaseRevokedCallback = callback;
   }
 
   /**
@@ -199,10 +206,7 @@ export class LeaseManager {
 
       this.startHeartbeat(data.ttl_seconds);
 
-      if (data.idle_timeout_seconds) {
-        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
-        debugLogToFile(`[lease-manager] Updated idle timeout from server: ${data.idle_timeout_seconds}s`);
-      }
+      this.idleTimeoutMs = data.ttl_seconds * 1000;
 
       this.updateActivity();
       this.startIdleCheck();
@@ -268,6 +272,7 @@ export class LeaseManager {
   /**
    * Renew the current lease.
    * Updates expiresAt on success.
+   * If the server returns 410 (lease revoked), clears local state and re-acquires.
    * 
    * @throws Error if renew fails or no active lease
    */
@@ -295,6 +300,23 @@ export class LeaseManager {
         },
       );
 
+      if (response.status === 410) {
+        debugLogToFile(`[lease-manager] Lease ${this.lease.leaseId} was revoked by server, re-acquiring...`);
+        
+        const revokedRefreshToken = this.lease.account.refreshToken;
+        
+        this.stopHeartbeat();
+        this.stopIdleCheck();
+        this.lease = null;
+        
+        if (this.onLeaseRevokedCallback && revokedRefreshToken) {
+          this.onLeaseRevokedCallback(revokedRefreshToken);
+        }
+        
+        await this.acquire();
+        return;
+      }
+
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         throw new Error(`Renew failed: ${response.status} ${response.statusText} ${errorText}`);
@@ -307,9 +329,7 @@ export class LeaseManager {
       this.stopHeartbeat();
       this.startHeartbeat(data.ttl_seconds);
 
-      if (data.idle_timeout_seconds) {
-        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
-      }
+      this.idleTimeoutMs = data.ttl_seconds * 1000;
 
       debugLogToFile(`[lease-manager] Renewed lease, new expiry: ${this.lease.expiresAt.toISOString()}`);
     } catch (error) {
@@ -381,9 +401,7 @@ export class LeaseManager {
 
       this.startHeartbeat(data.ttl_seconds);
 
-      if (data.idle_timeout_seconds) {
-        this.idleTimeoutMs = data.idle_timeout_seconds * 1000;
-      }
+      this.idleTimeoutMs = data.ttl_seconds * 1000;
 
       this.updateActivity();
       this.startIdleCheck();
