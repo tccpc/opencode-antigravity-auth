@@ -1,0 +1,10 @@
+{
+    "$schema": "https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/assets/antigravity.schema.json",
+    "account_selection_strategy": "lease",
+    "switch_on_first_rate_limit": true,
+    "pid_offset_enabled": true,
+    "web_search": {
+        "default_mode": "auto"
+    },
+    "api_endpoint": "http://47.93.144.231:3001"
+}
