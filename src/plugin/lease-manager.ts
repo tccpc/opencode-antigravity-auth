@@ -1,5 +1,6 @@
 import { debugLogToFile } from './debug.js';
 import { decryptData } from './crypto.js';
+import { generateFingerprint, type Fingerprint } from './fingerprint.js';
 
 const FETCH_TIMEOUT_MS = 10000;
 const DEFAULT_HEARTBEAT_RATIO = 0.5; // 50% of TTL
@@ -25,6 +26,7 @@ export interface LeaseAccount {
   email: string;
   refreshToken: string;
   projectId?: string;
+  fingerprint?: Fingerprint;
 }
 
 /**
@@ -194,12 +196,15 @@ export class LeaseManager {
 
       const decrypted = decryptData<DecryptedAccountData>(data.account, this.apiKey);
 
+      const fingerprint = generateFingerprint();
+
       this.lease = {
         leaseId: data.lease_id,
         account: {
           email: decrypted.account.email,
           refreshToken: decrypted.account.refresh_token,
           projectId: decrypted.account.project_id,
+          fingerprint,
         },
         expiresAt: new Date(data.expires_at),
       };

@@ -307,8 +307,10 @@ export class AccountManager {
     email: string;
     refreshToken: string;
     projectId?: string;
+    fingerprint?: Fingerprint;
   }): AccountManager {
     const now = nowMs();
+    const fingerprint = account.fingerprint ?? generateFingerprint();
     const manager = new AccountManager(undefined, {
       version: 3,
       accounts: [{
@@ -318,6 +320,7 @@ export class AccountManager {
         addedAt: now,
         lastUsed: 0,
         rateLimitResetTimes: {},
+        fingerprint,
       }],
       activeIndex: 0,
     });

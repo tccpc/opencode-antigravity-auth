@@ -3,7 +3,7 @@ import { tool } from "@opencode-ai/plugin";
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_PROVIDER_ID, type HeaderStyle } from "./constants";
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth";
 import type { AntigravityTokenExchangeResult } from "./antigravity/oauth";
-import { accessTokenExpired, isOAuthAuth, parseRefreshParts } from "./plugin/auth";
+import { accessTokenExpired, isOAuthAuth, parseRefreshParts, formatRefreshParts } from "./plugin/auth";
 import { promptAddAnotherAccount, promptLoginMode, promptProjectId } from "./plugin/cli";
 import { ensureProjectContext } from "./plugin/project";
 import {
@@ -49,6 +49,7 @@ import { executeSearch } from "./plugin/search";
 import type {
   GetAuth,
   LoaderResult,
+  OAuthAuthDetails,
   OAuthAuthorizationResult,
   PluginContext,
   PluginResult,
@@ -667,6 +668,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
 
   // Cached getAuth function for tool access
   let cachedGetAuth: GetAuth | null = null;
+  
+  // Cached account manager for tool access (supports both local and lease modes)
+  let currentAccountManager: AccountManager | null = null;
 
   // Initialize debug with config
   initializeDebug(config);
@@ -788,24 +792,32 @@ export const createAntigravityPlugin = (providerId: string) => async (
     async execute(args, ctx) {
       log.debug("Google Search tool called", { query: args.query, urlCount: args.urls?.length ?? 0 });
 
-      if (!cachedGetAuth) {
+      if (!currentAccountManager) {
         return "Error: Not authenticated with Antigravity. Please run `opencode auth login` to authenticate.";
       }
       
-      const getAuthFn = cachedGetAuth as GetAuth;
-      const auth = await getAuthFn();
-      if (!auth || !isOAuthAuth(auth)) {
-        return "Error: Not authenticated with Antigravity. Please run `opencode auth login` to authenticate.";
+      const account = currentAccountManager.getCurrentAccountForFamily("gemini");
+      if (!account) {
+        return "Error: No active account available. Please run `opencode auth login` to authenticate.";
       }
 
-      const parts = parseRefreshParts(auth.refresh);
-      const projectId = parts.managedProjectId || parts.projectId || "unknown";
+      const projectId = account.parts.managedProjectId || account.parts.projectId || "unknown";
 
-      let accessToken = auth.access;
-      if (!accessToken || accessTokenExpired(auth)) {
+      let accessToken = account.access;
+      if (!accessToken || (account.expires && account.expires < Date.now())) {
         try {
-          const refreshed = await refreshAccessToken(auth, client, providerId);
-          accessToken = refreshed?.access;
+          const authForRefresh: OAuthAuthDetails = {
+            type: "oauth",
+            access: account.access ?? "",
+            refresh: formatRefreshParts(account.parts),
+            expires: account.expires ?? 0,
+          };
+          const refreshed = await refreshAccessToken(authForRefresh, client, providerId);
+          if (refreshed) {
+            accessToken = refreshed.access;
+            account.access = refreshed.access;
+            account.expires = refreshed.expires;
+          }
         } catch (error) {
           return `Error: Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}`;
         }
@@ -891,6 +903,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
             }
           }
         }
+
+        currentAccountManager = accountManager;
+        cachedGetAuth = getAuth;
 
         // Initialize proactive token refresh queue (ported from LLM-API-Key-Proxy)
         let refreshQueue: ProactiveRefreshQueue | null = null;
