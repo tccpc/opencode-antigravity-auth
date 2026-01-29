@@ -39,6 +39,55 @@ To enable automatic fallback between pools, set in `antigravity.json`:
 
 ---
 
+## Checking Quotas
+
+Check your current API usage across all accounts:
+
+```bash
+opencode auth login
+# Select "Check quotas" from the menu
+```
+
+This shows remaining quota percentages and reset times for each model family:
+- **Claude** - Claude Opus/Sonnet quota
+- **Gemini 3 Pro** - Gemini 3 Pro quota
+- **Gemini 3 Flash** - Gemini 3 Flash quota
+
+### Standalone Quota Script
+
+For checking quotas outside OpenCode (debugging, CI, etc.):
+
+```bash
+node scripts/check-quota.mjs                    # Check all accounts
+node scripts/check-quota.mjs --account 2        # Check specific account
+node scripts/check-quota.mjs --path /path/to/accounts.json  # Custom path
+```
+
+---
+
+## Managing Accounts
+
+Enable or disable specific accounts to control which ones are used for requests:
+
+```bash
+opencode auth login
+# Select "Manage accounts (enable/disable)"
+```
+
+Or select an account from the list and choose "Enable/Disable account".
+
+**Disabled accounts:**
+- Are excluded from automatic rotation
+- Still appear in quota checks (marked `[disabled]`)
+- Can be re-enabled at any time
+
+This is useful when:
+- An account is temporarily banned or rate-limited for extended periods
+- You want to reserve certain accounts for specific use cases
+- Testing with a subset of accounts
+
+---
+
 ## Adding Accounts
 
 When running `opencode auth login` with existing accounts:
@@ -66,11 +115,13 @@ Accounts are stored in `~/.config/opencode/antigravity-accounts.json`:
     {
       "email": "user1@gmail.com",
       "refreshToken": "1//0abc...",
-      "projectId": "my-gcp-project"
+      "projectId": "my-gcp-project",
+      "enabled": true
     },
     {
       "email": "user2@gmail.com",
-      "refreshToken": "1//0xyz..."
+      "refreshToken": "1//0xyz...",
+      "enabled": false
     }
   ],
   "activeIndex": 0,
@@ -90,6 +141,7 @@ Accounts are stored in `~/.config/opencode/antigravity-accounts.json`:
 | `email` | Google account email |
 | `refreshToken` | OAuth refresh token (auto-managed) |
 | `projectId` | Optional. Required for Gemini CLI models. See [Troubleshooting](TROUBLESHOOTING.md#gemini-cli-permission-error). |
+| `enabled` | Optional. Set to `false` to disable account rotation. Defaults to `true`. |
 | `activeIndex` | Currently active account index |
 | `activeIndexByFamily` | Per-model-family active account (claude/gemini tracked separately) |
 

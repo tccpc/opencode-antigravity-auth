@@ -28,6 +28,7 @@ src/
     ├── request-helpers.ts   # Schema cleaning, thinking filters
     ├── thinking-recovery.ts # Turn boundary detection
     ├── recovery.ts          # Session recovery (tool_result_missing)
+    ├── quota.ts             # Quota checking (API usage stats)
     ├── cache.ts             # Auth & signature caching
     ├── accounts.ts          # Multi-account management
     └── debug.ts             # Debug logging

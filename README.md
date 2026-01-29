@@ -230,6 +230,10 @@ Add multiple Google accounts for higher combined quotas. The plugin automaticall
 opencode auth login  # Run again to add more accounts
 ```
 
+**Account management options (via `opencode auth login`):**
+- **Check quotas** — View remaining API quota for each account
+- **Manage accounts** — Enable/disable specific accounts for rotation
+
 For details on load balancing, dual quota pools, and account storage, see [docs/MULTI-ACCOUNT.md](docs/MULTI-ACCOUNT.md).
 
 ---
@@ -346,6 +350,18 @@ Invalid JSON payload received. Unknown name "parameters" at 'request.tools[0]'
 ### MCP Servers Causing Errors
 
 Some MCP servers have schemas incompatible with Antigravity's strict JSON format.
+
+**Common symptom:**
+```bash
+Invalid function name must start with a letter or underscore
+```
+
+Sometimes it shows up as:
+```bash
+GenerateContentRequest.tools[0].function_declarations[12].name: Invalid function name must start with a letter or underscore
+```
+
+This usually means an MCP tool name starts with a number (for example, a 1mcp key like `1mcp_*`). Rename the MCP key to start with a letter (e.g., `gw`) or disable that MCP entry for Antigravity models.
 
 **Diagnosis:**
 1. Disable all MCP servers in your config
@@ -564,6 +580,21 @@ Most users don't need to configure anything — defaults work well.
 | **2-5 accounts** | Default (`"hybrid"`) works great |
 | **5+ accounts** | `"account_selection_strategy": "round-robin"` |
 | **Parallel agents** | Add `"pid_offset_enabled": true` |
+
+### Rate Limit Scheduling
+
+Control how the plugin handles rate limits:
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `scheduling_mode` | `"cache_first"` | `"cache_first"` = wait for same account (preserves prompt cache), `"balance"` = switch immediately, `"performance_first"` = round-robin |
+| `max_cache_first_wait_seconds` | `60` | Max seconds to wait in cache_first mode before switching accounts |
+| `failure_ttl_seconds` | `3600` | Reset failure count after this many seconds (prevents old failures from permanently penalizing accounts) |
+
+**When to use each mode:**
+- **cache_first** (default): Best for long conversations. Waits for the same account to recover, preserving your prompt cache.
+- **balance**: Best for quick tasks. Switches accounts immediately when rate-limited for maximum availability.
+- **performance_first**: Best for many short requests. Distributes load evenly across all accounts.
 
 ### App Behavior
 

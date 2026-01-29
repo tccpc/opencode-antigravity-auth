@@ -8,6 +8,7 @@ import {
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_LOAD_ENDPOINTS,
   ANTIGRAVITY_HEADERS,
+  GEMINI_CLI_HEADERS,
 } from "../constants";
 import { createLogger } from "../plugin/logger";
 import { calculateTokenExpiry } from "../plugin/auth";
@@ -133,8 +134,8 @@ async function fetchProjectID(accessToken: string): Promise<string> {
   const loadHeaders: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
-    "User-Agent": "google-api-nodejs-client/9.15.1",
-    "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+    "User-Agent": GEMINI_CLI_HEADERS["User-Agent"],
+    "X-Goog-Api-Client": GEMINI_CLI_HEADERS["X-Goog-Api-Client"],
     "Client-Metadata": ANTIGRAVITY_HEADERS["Client-Metadata"],
   };
 
@@ -209,7 +210,11 @@ export async function exchangeAntigravity(
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "User-Agent": GEMINI_CLI_HEADERS["User-Agent"],
+        "X-Goog-Api-Client": GEMINI_CLI_HEADERS["X-Goog-Api-Client"],
       },
       body: new URLSearchParams({
         client_id: ANTIGRAVITY_CLIENT_ID,
@@ -233,6 +238,8 @@ export async function exchangeAntigravity(
       {
         headers: {
           Authorization: `Bearer ${tokenPayload.access_token}`,
+          "User-Agent": GEMINI_CLI_HEADERS["User-Agent"],
+          "X-Goog-Api-Client": GEMINI_CLI_HEADERS["X-Goog-Api-Client"],
         },
       },
     );

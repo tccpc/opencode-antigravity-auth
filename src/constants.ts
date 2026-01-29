@@ -71,16 +71,69 @@ export const GEMINI_CLI_ENDPOINT = ANTIGRAVITY_ENDPOINT_PROD;
 export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc";
 
 export const ANTIGRAVITY_HEADERS = {
-  "User-Agent": "antigravity/1.11.5 windows/amd64",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/1.104.0 Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36",
   "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
   "Client-Metadata": '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
 } as const;
 
 export const GEMINI_CLI_HEADERS = {
-  "User-Agent": "google-api-nodejs-client/9.15.1",
-  "X-Goog-Api-Client": "gl-node/22.17.0",
+  "User-Agent": "google-api-nodejs-client/10.3.0",
+  "X-Goog-Api-Client": "gl-node/22.18.0",
   "Client-Metadata": "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
 } as const;
+
+const ANTIGRAVITY_USER_AGENTS = [
+  "antigravity/1.11.5 windows/amd64",
+  "antigravity/1.11.4 darwin/arm64",
+  "antigravity/1.11.3 linux/amd64",
+  "antigravity/1.10.9 windows/amd64",
+  "antigravity/1.10.8 darwin/amd64",
+] as const;
+
+const ANTIGRAVITY_API_CLIENTS = [
+  "google-cloud-sdk vscode_cloudshelleditor/0.1",
+  "google-cloud-sdk vscode/1.96.0",
+  "google-cloud-sdk jetbrains/2024.3",
+  "google-cloud-sdk vscode/1.95.0",
+] as const;
+
+const GEMINI_CLI_USER_AGENTS = [
+  "google-api-nodejs-client/9.15.1",
+  "google-api-nodejs-client/9.14.0",
+  "google-api-nodejs-client/9.13.0",
+] as const;
+
+const GEMINI_CLI_API_CLIENTS = [
+  "gl-node/22.17.0",
+  "gl-node/22.12.0",
+  "gl-node/20.18.0",
+  "gl-node/21.7.0",
+] as const;
+
+function randomFrom<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+export type HeaderSet = {
+  "User-Agent": string;
+  "X-Goog-Api-Client": string;
+  "Client-Metadata": string;
+};
+
+export function getRandomizedHeaders(style: HeaderStyle): HeaderSet {
+  if (style === "gemini-cli") {
+    return {
+      "User-Agent": randomFrom(GEMINI_CLI_USER_AGENTS),
+      "X-Goog-Api-Client": randomFrom(GEMINI_CLI_API_CLIENTS),
+      "Client-Metadata": GEMINI_CLI_HEADERS["Client-Metadata"],
+    };
+  }
+  return {
+    "User-Agent": randomFrom(ANTIGRAVITY_USER_AGENTS),
+    "X-Goog-Api-Client": randomFrom(ANTIGRAVITY_API_CLIENTS),
+    "Client-Metadata": ANTIGRAVITY_HEADERS["Client-Metadata"],
+  };
+}
 
 export type HeaderStyle = "antigravity" | "gemini-cli";
 
@@ -146,6 +199,48 @@ export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator";
  * This is injected into requests to match CLIProxyAPI v6.6.89 behavior.
  * The instruction provides identity and guidelines for the Antigravity agent.
  */
+// ============================================================================
+// GOOGLE SEARCH TOOL CONSTANTS
+// ============================================================================
+
+/**
+ * Model used for Google Search grounding requests.
+ * Uses gemini-3-flash for fast, cost-effective search operations.
+ */
+export const SEARCH_MODEL = "gemini-3-flash";
+
+/**
+ * Thinking budget for deep search (more thorough analysis).
+ */
+export const SEARCH_THINKING_BUDGET_DEEP = 16384;
+
+/**
+ * Thinking budget for fast search (quick results).
+ */
+export const SEARCH_THINKING_BUDGET_FAST = 4096;
+
+/**
+ * Timeout for search requests in milliseconds (60 seconds).
+ */
+export const SEARCH_TIMEOUT_MS = 60000;
+
+/**
+ * System instruction for the Google Search tool.
+ */
+export const SEARCH_SYSTEM_INSTRUCTION = `You are an expert web search assistant with access to Google Search and URL analysis tools.
+
+Your capabilities:
+- Use google_search to find real-time information from the web
+- Use url_context to fetch and analyze content from specific URLs when provided
+
+Guidelines:
+- Always provide accurate, well-sourced information
+- Cite your sources when presenting facts
+- If analyzing URLs, extract the most relevant information
+- Be concise but comprehensive in your responses
+- If information is uncertain or conflicting, acknowledge it
+- Focus on answering the user's question directly`;
+
 export const ANTIGRAVITY_SYSTEM_INSTRUCTION = `You are Antigravity, a powerful agentic AI coding assistant designed by the Google DeepMind team working on Advanced Agentic Coding.
 You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.
 **Absolute paths only**

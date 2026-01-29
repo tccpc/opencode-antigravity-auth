@@ -1,4 +1,5 @@
 import { exec } from "node:child_process";
+import { tool } from "@opencode-ai/plugin";
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_PROVIDER_ID, type HeaderStyle } from "./constants";
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth";
 import type { AntigravityTokenExchangeResult } from "./antigravity/oauth";
@@ -43,9 +44,12 @@ import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker 
 import { initUsageReporter, reportUsage } from "./plugin/usage-reporter";
 import { LeaseManager } from "./plugin/lease-manager";
 import { initLifecycle } from "./plugin/lifecycle";
+import { checkAccountsQuota } from "./plugin/quota";
+import { executeSearch } from "./plugin/search";
 import type {
   GetAuth,
   LoaderResult,
+  OAuthAuthorizationResult,
   PluginContext,
   PluginResult,
   ProjectContextResult,
@@ -661,6 +665,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
   const config = loadConfig(directory);
   initRuntimeConfig(config);
 
+  // Cached getAuth function for tool access
+  let cachedGetAuth: GetAuth | null = null;
+
   // Initialize debug with config
   initializeDebug(config);
 
@@ -771,8 +778,61 @@ export const createAntigravityPlugin = (providerId: string) => async (
     }
   };
 
+  const googleSearchTool = tool({
+    description: "Search the web using Google Search and analyze URLs. Returns real-time information from the internet with source citations. Use this when you need up-to-date information about current events, recent developments, or any topic that may have changed. You can also provide specific URLs to analyze. IMPORTANT: If the user mentions or provides any URLs in their query, you MUST extract those URLs and pass them in the 'urls' parameter for direct analysis.",
+    args: {
+      query: tool.schema.string().describe("The search query or question to answer using web search"),
+      urls: tool.schema.array(tool.schema.string()).optional().describe("List of specific URLs to fetch and analyze. IMPORTANT: Always extract and include any URLs mentioned by the user in their query here."),
+      thinking: tool.schema.boolean().optional().default(true).describe("Enable deep thinking for more thorough analysis (default: true)"),
+    },
+    async execute(args, ctx) {
+      log.debug("Google Search tool called", { query: args.query, urlCount: args.urls?.length ?? 0 });
+
+      if (!cachedGetAuth) {
+        return "Error: Not authenticated with Antigravity. Please run `opencode auth login` to authenticate.";
+      }
+      
+      const getAuthFn = cachedGetAuth as GetAuth;
+      const auth = await getAuthFn();
+      if (!auth || !isOAuthAuth(auth)) {
+        return "Error: Not authenticated with Antigravity. Please run `opencode auth login` to authenticate.";
+      }
+
+      const parts = parseRefreshParts(auth.refresh);
+      const projectId = parts.managedProjectId || parts.projectId || "unknown";
+
+      let accessToken = auth.access;
+      if (!accessToken || accessTokenExpired(auth)) {
+        try {
+          const refreshed = await refreshAccessToken(auth, client, providerId);
+          accessToken = refreshed?.access;
+        } catch (error) {
+          return `Error: Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
+
+      if (!accessToken) {
+        return "Error: No valid access token available. Please run `opencode auth login` to re-authenticate.";
+      }
+
+      return executeSearch(
+        {
+          query: args.query,
+          urls: args.urls,
+          thinking: args.thinking,
+        },
+        accessToken,
+        projectId,
+        ctx.abort,
+      );
+    },
+  });
+
   return {
     event: eventHandler,
+    tool: {
+      google_search: googleSearchTool,
+    },
     auth: {
       provider: providerId,
       loader: async (getAuth: GetAuth, provider: Provider): Promise<LoaderResult | Record<string, unknown>> => {
@@ -1887,7 +1947,12 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 }));
 
                 const loginMode = await promptLoginMode(existingAccounts);
-                startFresh = loginMode === "fresh";
+                
+                if (loginMode.mode === "check" || loginMode.mode === "manage") {
+                  return {} as OAuthAuthorizationResult;
+                }
+                
+                startFresh = loginMode.mode === "add" && existingStorage.accounts.length === 0;
 
                 if (startFresh) {
                   console.log("\nStarting fresh - existing accounts will be replaced.\n");
